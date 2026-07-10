@@ -690,7 +690,7 @@ async function launchApp() {
   document.getElementById('app').style.display = 'block';
   await loadAll();
   applyAccessLevel();
-  document.getElementById('meetingHeader').textContent = '[Meeting day/time] · [Location]';
+  document.getElementById('meetingHeader').textContent = 'Check Announcements for meeting schedule & Location';
   if (isAdmin) {
     const renewalBtn = document.getElementById('sort-renewal');
     if (renewalBtn) renewalBtn.style.display = '';
