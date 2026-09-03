@@ -354,7 +354,12 @@
       <p id="checkinMeetingTime">Member Gathering</p>
       <div class="checkin-date" id="checkinDateDisplay"></div>
     </div>
+    <div id="kioskSearchWrap" style="display:none;max-width:500px;margin:0 auto 16px">
+      <input type="text" id="kioskSearchInput" placeholder="Start typing your name..." autocomplete="off"
+        style="width:100%;padding:20px 24px;font-size:22px;border-radius:16px;border:none;outline:none;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.2);text-align:center" />
+    </div>
     <div class="checkin-grid" id="checkinGrid"></div>
+    <div id="kioskEmptyState" style="display:none;text-align:center;color:#a5b0e8;font-size:16px;margin-top:20px">Type a few letters of your name above ☝️</div>
     <div id="checkinDone" style="display:none;max-width:500px;margin:20px auto 0;background:#ffffff22;border-radius:14px;padding:16px 20px;text-align:center;color:#fff;font-size:14px;font-weight:600;">
       <span style="font-size:28px;display:block;margin-bottom:6px">✅</span>
       All members checked in!
@@ -852,7 +857,8 @@ async function loadAll() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
-const isCheckin = window.location.search.includes('checkin');
+const isKiosk = window.location.search.includes('kiosk');
+const isCheckin = window.location.search.includes('checkin') || isKiosk;
 
 window.addEventListener('load', async () => {
   if (isCheckin) {
@@ -2038,12 +2044,26 @@ function setDeviceCheckinLock(name) {
   }
 }
 
+let kioskTodayAttendance = {};
+
 async function initCheckin() {
   const today = new Date();
   document.getElementById('checkinDateDisplay').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const dateStr = today.toISOString().slice(0,10);
   const existing = meetings.find(m=>m.date===dateStr);
   const todayAttendance = existing ? {...existing.attendance} : {};
+  kioskTodayAttendance = todayAttendance;
+
+  if (isKiosk) {
+    document.getElementById('kioskSearchWrap').style.display = 'block';
+    document.getElementById('kioskEmptyState').style.display = 'block';
+    document.getElementById('checkinGrid').innerHTML = '';
+    const input = document.getElementById('kioskSearchInput');
+    input.addEventListener('input', () => renderKioskMatches(input.value));
+    input.focus();
+    return; // no device lock, no full list — kiosk mode is search-driven
+  }
+
   const sorted = [...members].filter(m=>m.status==='Active').sort((a,b)=>a.contact.localeCompare(b.contact));
   document.getElementById('checkinGrid').innerHTML = sorted.map(m => `
     <div class="checkin-card ${todayAttendance[m.id]==='present'?'checked-in':''}" id="ci-${m.id}" onclick="checkInMember(${m.id},'${m.contact.replace(/'/g,"\\'")}','${m.biz.replace(/'/g,"\\'")}')">
@@ -2055,6 +2075,35 @@ async function initCheckin() {
   if (deviceLock) {
     showToast('✅ This phone already checked in ' + deviceLock.name + ' today');
   }
+}
+
+function renderKioskMatches(query) {
+  const q = query.trim().toLowerCase();
+  const emptyState = document.getElementById('kioskEmptyState');
+  const grid = document.getElementById('checkinGrid');
+
+  if (!q) {
+    grid.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  const matches = members
+    .filter(m => m.status === 'Active' && (m.contact.toLowerCase().includes(q) || m.biz.toLowerCase().includes(q)))
+    .sort((a,b) => a.contact.localeCompare(b.contact))
+    .slice(0, 8);
+
+  if (matches.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;color:#a5b0e8;font-size:15px;margin-top:12px">No match yet — keep typing, or check with the front desk</div>';
+    return;
+  }
+
+  grid.innerHTML = matches.map(m => `
+    <div class="checkin-card ${kioskTodayAttendance[m.id]==='present'?'checked-in':''}" id="ci-${m.id}" onclick="checkInMember(${m.id},'${m.contact.replace(/'/g,"\\'")}','${m.biz.replace(/'/g,"\\'")}')">
+      <div><div class="checkin-name">${m.contact}</div><div class="checkin-biz">${m.biz}</div></div>
+      <div class="checkin-status" id="ci-status-${m.id}">${kioskTodayAttendance[m.id]==='present'?'✓':''}</div>
+    </div>`).join('');
 }
 
 async function checkInMember(id, name, biz) {
@@ -2069,16 +2118,20 @@ async function checkInMember(id, name, biz) {
   }
 
   // Block further check-ins once this device has already been used to check someone in today
-  const deviceLock = getDeviceCheckinLock();
-  if (deviceLock) {
-    showToast('⚠️ This phone already checked in ' + deviceLock.name + ' today. Please have others scan the QR code with their own phone.');
-    return;
+  // (skipped entirely in kiosk mode — a shared supervised screen is meant to check in many people)
+  if (!isKiosk) {
+    const deviceLock = getDeviceCheckinLock();
+    if (deviceLock) {
+      showToast('⚠️ This phone already checked in ' + deviceLock.name + ' today. Please have others scan the QR code with their own phone.');
+      return;
+    }
   }
 
   card.classList.add('checked-in');
   statusEl.textContent='✓';
   checkinsThisScan++;
-  setDeviceCheckinLock(name);
+  if (!isKiosk) setDeviceCheckinLock(name);
+  else kioskTodayAttendance[id] = 'present';
   const dateStr = new Date().toISOString().slice(0,10);
   const existing = meetings.find(m=>m.date===dateStr);
   if (existing) {
@@ -2093,7 +2146,17 @@ async function checkInMember(id, name, biz) {
   document.getElementById('checkinConfirm').classList.add('show');
 }
 
-function dismissConfirm() { document.getElementById('checkinConfirm').classList.remove('show'); }
+function dismissConfirm() {
+  document.getElementById('checkinConfirm').classList.remove('show');
+  if (isKiosk) {
+    const input = document.getElementById('kioskSearchInput');
+    if (input) {
+      input.value = '';
+      renderKioskMatches('');
+      input.focus();
+    }
+  }
+}
 
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 document.getElementById('visitorOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('visitorOverlay'))closeVisitorModal();});
