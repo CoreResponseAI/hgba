@@ -310,7 +310,7 @@
     .checkin-grid { max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
     .checkin-card { background: var(--white); border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; border: 2.5px solid transparent; transition: all .15s; box-shadow: 0 2px 8px #0002; }
     .checkin-card:hover { border-color: var(--periwinkle); transform: translateY(-1px); }
-    .checkin-card.checked-in { background: #ecfdf5; border-color: #10b981; }
+    .checkin-card.checked-in { background: #ecfdf5; border-color: #10b981; cursor: default; }
     .checkin-card.checked-in .checkin-name { color: #059669; }
     .checkin-name { font-size: 16px; font-weight: 700; color: var(--dark); }
     .checkin-biz { font-size: 13px; color: var(--gray); margin-top: 2px; }
@@ -2015,6 +2015,29 @@ function copyEmails() {
 let checkinsThisScan = 0;
 const MAX_CHECKINS_PER_SCAN = 1;
 
+// Device-level lock: survives page reloads/rescans (unlike a plain JS variable),
+// so re-scanning the same QR code on the same phone can't be used to check in a second person.
+function getDeviceCheckinLock() {
+  try {
+    const raw = localStorage.getItem('hgba_checkin_device_lock');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0,10);
+    return data.date === today ? data : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function setDeviceCheckinLock(name) {
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    localStorage.setItem('hgba_checkin_device_lock', JSON.stringify({ date: today, name }));
+  } catch (err) {
+    console.error('Could not set device check-in lock:', err);
+  }
+}
+
 async function initCheckin() {
   const today = new Date();
   document.getElementById('checkinDateDisplay').textContent = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
@@ -2027,36 +2050,35 @@ async function initCheckin() {
       <div><div class="checkin-name">${m.contact}</div><div class="checkin-biz">${m.biz}</div></div>
       <div class="checkin-status" id="ci-status-${m.id}">${todayAttendance[m.id]==='present'?'✓':''}</div>
     </div>`).join('');
+
+  const deviceLock = getDeviceCheckinLock();
+  if (deviceLock) {
+    showToast('✅ This phone already checked in ' + deviceLock.name + ' today');
+  }
 }
 
 async function checkInMember(id, name, biz) {
   const card = document.getElementById('ci-'+id);
   const statusEl = document.getElementById('ci-status-'+id);
 
+  // Checked-in cards are locked — tapping again does nothing except confirm they're already in.
+  // (Undoing a check-in now requires an admin, via the Attendance tab — not available from this shared screen.)
   if (card.classList.contains('checked-in')) {
-    card.classList.remove('checked-in');
-    statusEl.textContent = '';
-    checkinsThisScan = Math.max(0, checkinsThisScan - 1);
-    const dateStr = new Date().toISOString().slice(0,10);
-    const existing = meetings.find(m=>m.date===dateStr);
-    if (existing) {
-      const updated = {...existing.attendance};
-      delete updated[id];
-      await sb.from('hgba_meetings').update({attendance:updated}).eq('id',existing.id);
-    }
-    await loadAll();
-    showToast('↩️ Check-in removed for ' + name);
+    showToast('✅ ' + name + ' is already checked in');
     return;
   }
 
-  if (checkinsThisScan >= MAX_CHECKINS_PER_SCAN) {
-    showToast('⚠️ Only one check-in per scan. Please have each person scan the QR code individually.');
+  // Block further check-ins once this device has already been used to check someone in today
+  const deviceLock = getDeviceCheckinLock();
+  if (deviceLock) {
+    showToast('⚠️ This phone already checked in ' + deviceLock.name + ' today. Please have others scan the QR code with their own phone.');
     return;
   }
 
   card.classList.add('checked-in');
   statusEl.textContent='✓';
   checkinsThisScan++;
+  setDeviceCheckinLock(name);
   const dateStr = new Date().toISOString().slice(0,10);
   const existing = meetings.find(m=>m.date===dateStr);
   if (existing) {
