@@ -836,7 +836,7 @@
       Changes are reviewed by HGBA before they go live.
     </p>
     <div class="section-label">Business Info</div>
-    <div class="field"><label>Contact Person</label><input id="c-contact-person" /></div>
+    <div class="field"><label>Contact Name<span class="field-hint">The person shown on your directory listing</span></label><input id="c-contact-person" /></div>
     <div class="field-row">
       <div class="field"><label>Phone</label><input id="c-phone" placeholder="(555) 555-5555" /></div>
       <div class="field"><label>Email</label><input id="c-email" placeholder="you@business.com" /></div>
@@ -1413,7 +1413,7 @@ function openClaimModal(id) {
   const m = members.find(x => x.id === id);
   if (!m) return;
   document.getElementById('claimBizName').textContent = m.biz;
-  document.getElementById('c-contact-person').value = m.contactPerson || '';
+  document.getElementById('c-contact-person').value = m.contact || m.contactPerson || '';
   document.getElementById('c-phone').value = m.phone || '';
   document.getElementById('c-email').value = m.email || '';
   document.getElementById('c-website').value = m.website || '';
@@ -1447,7 +1447,7 @@ async function submitClaim() {
     return;
   }
   const submitted = {
-    contact_person: document.getElementById('c-contact-person').value.trim(),
+    contact: document.getElementById('c-contact-person').value.trim(),
     phone: document.getElementById('c-phone').value.trim(),
     email: document.getElementById('c-email').value.trim(),
     website: document.getElementById('c-website').value.trim(),
@@ -1481,7 +1481,7 @@ async function submitClaim() {
 
 // ── ADMIN: PENDING PROFILE UPDATES ────────────────────────────
 const PENDING_FIELD_LABELS = {
-  contact_person: 'Contact Person', phone: 'Phone', email: 'Email', website: 'Website', description: 'Business Description',
+  contact: 'Contact Name', contact_person: 'Contact Person (old field)', phone: 'Phone', email: 'Email', website: 'Website', description: 'Business Description',
   category_primary: 'Primary Category', category_secondary: 'Secondary Category',
   address: 'Business Address', facebook: 'Facebook', instagram: 'Instagram',
   linkedin: 'LinkedIn', youtube: 'YouTube', google_business_url: 'Google Business Profile',
@@ -1490,7 +1490,7 @@ const PENDING_FIELD_LABELS = {
 };
 
 const MEMBER_FIELD_MAP = {
-  contact_person: 'contactPerson', phone: 'phone', email: 'email', website: 'website', description: 'description',
+  contact: 'contact', contact_person: 'contactPerson', phone: 'phone', email: 'email', website: 'website', description: 'description',
   category_primary: 'categoryPrimary', category_secondary: 'categorySecondary',
   address: 'address', facebook: 'facebook', instagram: 'instagram',
   linkedin: 'linkedin', youtube: 'youtube', google_business_url: 'googleBusinessUrl',
