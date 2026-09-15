@@ -476,6 +476,36 @@
     </div>
     <div class="checkin-grid" id="checkinGrid"></div>
 
+    <div id="guestPrompt" style="max-width:500px;margin:22px auto 0;text-align:center">
+      <div style="font-size:13px;color:#8b95b8;margin-bottom:10px">Not on the list?</div>
+      <button onclick="openGuestForm()" style="padding:13px 24px;border-radius:12px;font-family:inherit;
+        border:1.5px solid rgba(232,107,214,0.45);background:rgba(175,3,231,0.12);color:#fff;
+        font-weight:700;font-size:15px;cursor:pointer">I'm visiting today →</button>
+    </div>
+
+    <div id="guestForm" style="display:none;max-width:500px;margin:22px auto 0;background:rgba(15,18,42,0.92);
+      border:1px solid rgba(175,3,231,0.34);border-radius:18px;padding:22px 20px;
+      box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+      <div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:4px">Welcome — tell us who you are</div>
+      <div style="font-size:12.5px;color:#94a3b8;margin-bottom:16px;line-height:1.5">
+        So the host knows you came, and can follow up.
+      </div>
+      <div style="display:flex;gap:10px">
+        <input id="g-first" placeholder="First name" style="flex:1;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+        <input id="g-last" placeholder="Last name" style="flex:1;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+      </div>
+      <input id="g-biz" placeholder="Business name" style="width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+      <input id="g-email" type="email" placeholder="Email" style="width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+      <input id="g-phone" type="tel" placeholder="Phone (optional)" style="width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+      <input id="g-industry" placeholder="What do you do? (optional)" style="width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:10px" />
+      <input id="g-referred" placeholder="Who invited you? (optional)" style="width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#fff;font-family:inherit;font-size:15px;outline:none;margin-bottom:14px" />
+      <button id="guestSubmitBtn" onclick="submitGuest()" style="width:100%;padding:14px;border-radius:12px;border:none;
+        background:linear-gradient(95deg,#FD0A99,#AF03E7 52%,#00BFFD);color:#fff;font-weight:700;font-size:16px;
+        cursor:pointer;font-family:inherit">Check in as a guest</button>
+      <button onclick="closeGuestForm()" style="width:100%;padding:11px;margin-top:8px;border-radius:12px;
+        border:none;background:transparent;color:#8b95b8;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+    </div>
+
     <div id="kioskEmptyState" style="display:none;text-align:center;color:#a5b0e8;font-size:16px;margin-top:20px">Type a few letters of your name above ☝️</div>
     <div id="checkinDone" style="display:none;max-width:500px;margin:20px auto 0;background:#ffffff22;border-radius:14px;padding:16px 20px;text-align:center;color:#fff;font-size:14px;font-weight:600;">
       <span style="font-size:28px;display:block;margin-bottom:6px">✅</span>
@@ -2385,6 +2415,86 @@ async function checkInMember(id, name, biz) {
   document.getElementById('confirmName').textContent=name;
   document.getElementById('confirmBiz').textContent=biz;
   document.getElementById('checkinConfirm').classList.add('show');
+}
+
+// ── GUEST CHECK-IN ────────────────────────────────────────────
+function openGuestForm() {
+  document.getElementById('guestPrompt').style.display = 'none';
+  document.getElementById('guestForm').style.display = 'block';
+  document.getElementById('g-first').focus();
+}
+
+function closeGuestForm() {
+  document.getElementById('guestForm').style.display = 'none';
+  document.getElementById('guestPrompt').style.display = 'block';
+}
+
+async function submitGuest() {
+  const val = id => (document.getElementById(id).value || '').trim();
+  const first = val('g-first'), last = val('g-last'), biz = val('g-biz'), email = val('g-email');
+
+  if (!first || !last || !biz) { showToast('Please add your name and business'); return; }
+  if (!email) { showToast('Please add an email so the host can follow up'); return; }
+
+  const btn = document.getElementById('guestSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Checking you in...';
+
+  const today = new Date().toISOString().slice(0,10);
+
+  // Returning guest? Match on email so the visit counter stays accurate
+  // instead of creating a second record for the same person.
+  const existing = visitors.find(v => v.email && v.email.toLowerCase() === email.toLowerCase());
+
+  try {
+    let visitorId;
+    if (existing) {
+      const sessions = (existing.sessions || 1) + (existing.lastVisit === today ? 0 : 1);
+      await sb.from('hgba_visitors').update({
+        last_visit: today, sessions,
+        phone: val('g-phone') || existing.phone,
+        industry: val('g-industry') || existing.industry
+      }).eq('id', existing.id);
+      visitorId = existing.id;
+    } else {
+      const payload = {
+        first, last, biz, email,
+        phone: val('g-phone'), industry: val('g-industry'), referred: val('g-referred'),
+        first_visit: today, last_visit: today, sessions: 1,
+        status: 'Active Visitor',
+        notes: 'Self checked-in at the door'
+      };
+      await sb.from('hgba_visitors').insert(payload);
+    }
+
+    await loadAll();
+    if (!visitorId) {
+      const added = visitors.find(v => v.email && v.email.toLowerCase() === email.toLowerCase());
+      visitorId = added ? added.id : null;
+    }
+
+    // Mark them present for today's meeting, same as a member.
+    if (visitorId) {
+      const meeting = meetings.find(m => m.date === today);
+      if (meeting) {
+        const updated = { ...(meeting.visitorAttendance || {}), [visitorId]: 'present' };
+        await sb.from('hgba_meetings').update({ visitor_attendance: updated }).eq('id', meeting.id);
+      } else {
+        const rec = { date: today, attendance: {}, visitor_attendance: { [visitorId]: 'present' } };
+        await sb.from('hgba_meetings').insert(rec);
+      }
+      await loadAll();
+    }
+
+    document.getElementById('guestForm').style.display = 'none';
+    document.getElementById('confirmName').textContent = first + ' ' + last;
+    document.getElementById('confirmBiz').textContent = biz;
+    document.getElementById('checkinConfirm').classList.add('show');
+  } catch (err) {
+    console.error('Guest check-in failed:', err);
+    showToast('Something went wrong — please see the host at the door');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Check in as a guest';
+  }
 }
 
 function dismissConfirm() {
