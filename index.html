@@ -337,19 +337,25 @@
     .empty { padding: 40px; text-align: center; color: #aaa; }
 
     /* CHECK-IN */
-    .checkin-page { min-height: 100vh; background: linear-gradient(135deg, var(--navy), #2d3e8f); padding: 24px 16px; }
+        .checkin-page { min-height: 100vh; padding: 26px 16px 40px;
+      background:
+        radial-gradient(760px 520px at 12% 4%, rgba(253,43,163,0.26), transparent 62%),
+        radial-gradient(680px 520px at 88% 18%, rgba(0,191,253,0.20), transparent 62%),
+        radial-gradient(900px 640px at 50% 116%, rgba(87,18,252,0.30), transparent 62%),
+        #05070f; }
+    .checkin-logo { width: 168px; height: auto; display: block; margin: 0 auto 14px; }
     .checkin-header { text-align: center; margin-bottom: 28px; }
-    .checkin-header h1 { font-size: 24px; font-weight: 900; color: #fff; margin-bottom: 6px; }
-    .checkin-header p { font-size: 14px; color: #a5b0e8; }
-    .checkin-date { display: inline-block; background: #ffffff22; color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 13px; font-weight: 700; margin-top: 8px; }
+    .checkin-header h1 { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .checkin-header p { font-size: 13px; color: #E86BD6; font-weight: 600; letter-spacing: 0.04em; }
+    .checkin-date { display: inline-block; background: rgba(255,255,255,0.07); border: 1px solid rgba(232,107,214,0.34); color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 13px; font-weight: 700; margin-top: 10px; }
     .checkin-grid { max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
     .checkin-card { background: var(--white); border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; border: 2.5px solid transparent; transition: all .15s; box-shadow: 0 2px 8px #0002; }
-    .checkin-card:hover { border-color: var(--periwinkle); transform: translateY(-1px); }
+    .checkin-card:hover { border-color: #E86BD6; transform: translateY(-1px); }
     .checkin-card.checked-in { background: #ecfdf5; border-color: #10b981; cursor: default; }
     .checkin-card.checked-in .checkin-name { color: #059669; }
     .checkin-name { font-size: 16px; font-weight: 700; color: var(--dark); }
     .checkin-biz { font-size: 13px; color: var(--gray); margin-top: 2px; }
-    .checkin-status { width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; transition: all .15s; }
+    .checkin-status { width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid #e5e7f5; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; transition: all .15s; }
     .checkin-card.checked-in .checkin-status { background: #10b981; border-color: #10b981; color: #fff; }
     .checkin-confirm { position: fixed; inset: 0; background: #00000088; display: none; align-items: center; justify-content: center; z-index: 200; }
     .checkin-confirm.show { display: flex; }
@@ -357,7 +363,7 @@
     .checkin-confirm-box .big-check { font-size: 56px; margin-bottom: 12px; }
     .checkin-confirm-box h2 { font-size: 20px; font-weight: 800; color: var(--dark); margin-bottom: 4px; }
     .checkin-confirm-box p { font-size: 14px; color: var(--gray); margin-bottom: 20px; }
-    .checkin-confirm-btn { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--navy); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .checkin-confirm-btn { width: 100%; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(95deg, #FD0A99, #AF03E7 52%, #00BFFD); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
 
     .table { display: none; }
     .table-header { display: none; }
@@ -452,7 +458,7 @@
 <div id="checkinPage" style="display:none">
   <div class="checkin-page">
     <div class="checkin-header">
-      <div style="font-size:40px;margin-bottom:8px">🏢</div>
+      <img class="checkin-logo" src="vybx-logo.png" alt="VYBX" />
       <h1>HGBA Member Directory</h1>
       <p id="checkinMeetingTime">Member Gathering</p>
       <div class="checkin-date" id="checkinDateDisplay"></div>
@@ -2240,6 +2246,12 @@ async function initCheckin() {
     return; // no device lock, no full list — kiosk mode is search-driven
   }
 
+  // Search box helps when the member list is long; the full list stays below it.
+  document.getElementById('kioskSearchWrap').style.display = 'block';
+  const searchInput = document.getElementById('kioskSearchInput');
+  searchInput.placeholder = 'Start typing your name...';
+  searchInput.addEventListener('input', () => filterCheckinList(searchInput.value));
+
   const sorted = [...members].filter(m=>m.status==='Active').sort((a,b)=>a.contact.localeCompare(b.contact));
   document.getElementById('checkinGrid').innerHTML = sorted.map(m => `
     <div class="checkin-card ${todayAttendance[m.id]==='present'?'checked-in':''}" id="ci-${m.id}" onclick="checkInMember(${m.id},'${m.contact.replace(/'/g,"\\'")}','${m.biz.replace(/'/g,"\\'")}')">
@@ -2250,6 +2262,25 @@ async function initCheckin() {
   const deviceLock = getDeviceCheckinLock();
   if (deviceLock) {
     showToast('✅ This phone already checked in ' + deviceLock.name + ' today');
+  }
+}
+
+// Filters the visible check-in cards without rebuilding them, so any
+// already-checked-in state stays intact.
+function filterCheckinList(query) {
+  const q = (query || '').trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#checkinGrid .checkin-card').forEach(card => {
+    const name = (card.querySelector('.checkin-name')?.textContent || '').toLowerCase();
+    const biz  = (card.querySelector('.checkin-biz')?.textContent || '').toLowerCase();
+    const hit = !q || name.includes(q) || biz.includes(q);
+    card.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  const empty = document.getElementById('kioskEmptyState');
+  if (empty) {
+    empty.style.display = (q && shown === 0) ? 'block' : 'none';
+    empty.textContent = 'No match for "' + query + '" — check with the host at the door.';
   }
 }
 
