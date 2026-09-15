@@ -462,19 +462,20 @@
       <h1>HGBA Member Directory</h1>
       <p id="checkinMeetingTime">Member Gathering</p>
       <div class="checkin-date" id="checkinDateDisplay"></div>
+    <div id="directoryBanner" style="display:none;max-width:500px;margin:18px auto 0">
+      <a id="directoryBtn" style="display:block;padding:15px 22px;border-radius:14px;text-decoration:none;text-align:center;
+         background:linear-gradient(95deg,#FD0A99,#AF03E7 52%,#00BFFD);color:#fff;font-weight:700;font-size:16px;
+         box-shadow:0 10px 28px rgba(253,43,163,0.32)">
+        ✓ You're checked in — Open the Member Directory →
+      </a>
+    </div>
     </div>
     <div id="kioskSearchWrap" style="display:none;max-width:500px;margin:0 auto 16px">
       <input type="text" id="kioskSearchInput" placeholder="Start typing your name..." autocomplete="off"
         style="width:100%;padding:20px 24px;font-size:22px;border-radius:16px;border:none;outline:none;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.2);text-align:center" />
     </div>
     <div class="checkin-grid" id="checkinGrid"></div>
-    <div style="max-width:500px;margin:22px auto 0;text-align:center">
-      <a id="directoryBtn" style="display:inline-block;padding:14px 26px;border-radius:12px;text-decoration:none;
-         background:linear-gradient(95deg,#FD0A99,#AF03E7 52%,#00BFFD);color:#fff;font-weight:700;font-size:15px">
-        Open the Member Directory →
-      </a>
-      <div style="font-size:12px;color:#8b95b8;margin-top:10px">Already checked in? Head straight to the directory.</div>
-    </div>
+
     <div id="kioskEmptyState" style="display:none;text-align:center;color:#a5b0e8;font-size:16px;margin-top:20px">Type a few letters of your name above ☝️</div>
     <div id="checkinDone" style="display:none;max-width:500px;margin:20px auto 0;background:#ffffff22;border-radius:14px;padding:16px 20px;text-align:center;color:#fff;font-size:14px;font-weight:600;">
       <span style="font-size:28px;display:block;margin-bottom:6px">✅</span>
@@ -2288,6 +2289,8 @@ async function initCheckin() {
 
   const deviceLock = getDeviceCheckinLock();
   if (deviceLock) {
+    // Checked in earlier on this phone — the directory is open to them.
+    document.getElementById('directoryBanner').style.display = 'block';
     showToast('✅ This phone already checked in ' + deviceLock.name + ' today');
   }
 }
@@ -2375,6 +2378,10 @@ async function checkInMember(id, name, biz) {
     await sb.from('hgba_meetings').insert({date:dateStr,attendance:{[id]:'present'},visitor_attendance:{}});
   }
   await loadAll();
+  // Just checked in — reveal the way into the directory.
+  const banner = document.getElementById('directoryBanner');
+  if (banner) banner.style.display = 'block';
+
   document.getElementById('confirmName').textContent=name;
   document.getElementById('confirmBiz').textContent=biz;
   document.getElementById('checkinConfirm').classList.add('show');
